@@ -31,34 +31,26 @@ public class CustomTokenGenerator extends JWTGenerator {
     @Override
     public Map<String, String> populateCustomClaims(TokenValidationContext validationContext) throws APIManagementException {
         ClaimsRetriever claimsRetriever = getClaimsRetriever();
-        String disableAuthorizationClaimCache = System.getProperty(DISABLE_AUTHORIZATION_CLAIM_CACHE);
         if (claimsRetriever != null) {
 
-            if (StringUtils.isEmpty(disableAuthorizationClaimCache) || !Boolean.parseBoolean(disableAuthorizationClaimCache)) {
+            //fix for https://github.com/wso2/product-apim/issues/4112
+            String accessToken = validationContext.getAccessToken();
+            AuthorizationGrantCacheKey cacheKey = new AuthorizationGrantCacheKey(accessToken);
 
-                //fix for https://github.com/wso2/product-apim/issues/4112
-                String accessToken = validationContext.getAccessToken();
-                AuthorizationGrantCacheKey cacheKey = new AuthorizationGrantCacheKey(accessToken);
-
-                Map<String, String> customClaims = getClaimsFromCache(cacheKey);
-                if (isNotEmpty(customClaims)) {
-                    if (log.isDebugEnabled()) {
-                        log.debug("The custom claims are retrieved from AuthorizationGrantCache for user : "
-                                + validationContext.getValidationInfoDTO().getEndUserName());
-                    }
-                    return customClaims;
-                } else {
-                    if (log.isDebugEnabled()) {
-                        log.debug("Custom claims are not available in the AuthorizationGrantCache. Hence will be "
-                                + "retrieved from the user store for user : " + validationContext.getValidationInfoDTO()
-                                .getEndUserName());
-                    }
-                }
-
+            Map<String, String> customClaims = getClaimsFromCache(cacheKey);
+            if (isNotEmpty(customClaims)) {
                 if (log.isDebugEnabled()) {
-                    log.debug("Calling Authorization claim cache disabled");
+                    log.debug("The custom claims are retrieved from AuthorizationGrantCache for user : "
+                            + validationContext.getValidationInfoDTO().getEndUserName());
+                }
+            } else {
+                if (log.isDebugEnabled()) {
+                    log.debug("Custom claims are not available in the AuthorizationGrantCache. Hence will be "
+                            + "retrieved from the user store for user : " + validationContext.getValidationInfoDTO()
+                            .getEndUserName());
                 }
             }
+
             // If claims are not found in AuthorizationGrantCache, they will be retrieved from the userstore.
             String tenantAwareUserName = validationContext.getValidationInfoDTO().getEndUserName();
 
@@ -80,9 +72,15 @@ public class CustomTokenGenerator extends JWTGenerator {
                     String username = split[0].substring(0, split[0].length() - 1);
 
                     if (manager.isExistingUser(username)) {
-                        return claimsRetriever.getClaims(tenantAwareUserName);
+                        Map<String, String> retrieveClaims = claimsRetriever.getClaims(tenantAwareUserName);
+                        retrieveClaims.putAll(customClaims);
+                        return retrieveClaims;
                     } else {
-                        log.warn("User " + tenantAwareUserName + " cannot be found by user store manager");
+                        if (!customClaims.isEmpty()) {
+                            return customClaims;
+                        } else {
+                            log.warn("User " + tenantAwareUserName + " cannot be found by user store manager");
+                        }
                     }
                 } else {
                     log.error("Tenant cannot be found for username: " + tenantAwareUserName);
