@@ -72,9 +72,8 @@ public class CustomTokenGenerator extends JWTGenerator {
                     String username = split[0].substring(0, split[0].length() - 1);
 
                     if (manager.isExistingUser(username)) {
-                        Map<String, String> retrieveClaims = claimsRetriever.getClaims(tenantAwareUserName);
-                        retrieveClaims.putAll(customClaims);
-                        return retrieveClaims;
+                        customClaims.putAll(claimsRetriever.getClaims(tenantAwareUserName));
+                        return customClaims;
                     } else {
                         if (!customClaims.isEmpty()) {
                             return customClaims;
