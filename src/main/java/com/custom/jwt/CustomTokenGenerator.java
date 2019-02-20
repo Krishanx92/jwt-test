@@ -1,4 +1,4 @@
-package com.hilton.jwt;
+package com.custom.jwt;
 
 
 import org.apache.commons.lang.StringUtils;
